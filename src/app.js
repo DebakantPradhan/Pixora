@@ -22,4 +22,13 @@ app.use(express.static("public"))   //Express looks up the files relative to the
 // configuration for cookieParser used to execute CRUD opeartions on cookies
 app.use(cookieParser())
 
+
+//routes import 
+import userRouter from "./routes/user.routes.js"
+
+//routes declaration 
+app.use("/api/v1/users", userRouter)
+
+//http://localhost:3000/api/v1/users/
+
 export {app} 
