@@ -1,12 +1,12 @@
 // require('dotenv').config()       //this one is for commonjs synatx 
 // console.log(process.env)
 
-// import dotenv from "dotenv/config"
-import dotenv from "dotenv"
+import dotenv from "dotenv/config"
+// import dotenv from "dotenv"          //not properly loading the env variables
 import connectDB from "./db/db_connect.js"
 import {app} from "./app.js"
 
-dotenv.config()
+// dotenv.config()
 // console.log(process.env)
 
 connectDB()

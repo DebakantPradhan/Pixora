@@ -1,13 +1,19 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { response } from 'express';
+// import { response } from 'express';
 import fs from "fs"
+// import { ApiError } from './ApiError.js';
+
+// import dotenv from 'dotenv/config.js';      //this code only works when this line is uncommented.(ps: fixed after adding this line in index file instead of "import dotenv from 'dotenv'")
 
 //cloudinary configuration
+
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET // Click 'View Credentials' below to copy your API secret
 });
+
+// console.log(process.env.CLOUDINARY_API_KEY);
 
 const uplaodOnCloudinary = async (localFilePath) => {
     try {
@@ -20,10 +26,17 @@ const uplaodOnCloudinary = async (localFilePath) => {
         )
         //file has been uplaoded successfully
         console.log("file has been uplaoded successfully on cloudinary",uploadResult.url)
-        return response
+        fs.unlinkSync(localFilePath) 
+        
+        // console.log(uploadResult);
+        return uploadResult;
     } catch (error) {
-        fs.unlink(localFilePath)    //remove local temp file since it is corrupted and uplaod is failed
+        fs.unlinkSync(localFilePath)    //remove local temp file since it is corrupted and uplaod is failed
         return null
+
+        //for debugging used the following turned out to be api call error api key not given actually there were no " " in .env file apikey.
+        // console.log("cloudinary error:\n",error);
+        // throw new ApiError(500, "Failed to upload file to cloudinary");
     }
 }
 
