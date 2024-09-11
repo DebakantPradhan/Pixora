@@ -1,7 +1,7 @@
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { User } from "../models/user.model.js"
-import { uplaodOnCloudinary } from "../utils/cloudinary.js";
+import { deleteFileFromCloudinary, uplaodOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 
@@ -270,7 +270,7 @@ const changeCurrentPassword = asyncHandler(async(req,res)=>{
 const getCurrentUser = asyncHandler(async(req, res)=>{
    res
    .status(200)
-   .json(200, req.user , "Current user fetched successfully")
+   .json(new ApiResponse(200, req.user , "Current user fetched successfully"))
 })
 
 const updateAccountDetails = asyncHandler(async(req, res) => {
@@ -280,7 +280,7 @@ const updateAccountDetails = asyncHandler(async(req, res) => {
       throw new ApiError(400,"All fields are required")
    }
 
-   User.findByIdAndUpdate(
+   const user = await User.findByIdAndUpdate(
       req.user?._id,
       {
          $set:{
@@ -341,12 +341,25 @@ const updateUserAvatar = asyncHandler(async(req,res)=>{
       throw new ApiError(400,"Avatar is required")
    }
 
+   // TODO: delete old image from cloudinary
+
+   const userOldAvatarUrl = await User.findById(req.user?._id)?.avatar
+
+   // Extract public ID from the current avatar URL
+   // const currentAvatarUrl = user?.avatar;
+   let publicId      //store the public id to use in future while deleting from cloudinary
+   if (userOldAvatarUrl) {
+      //in the url of cloudinary the last part is cloudinary.com/..../image.jpg
+      //here 'image' is the public id 
+      publicId = userOldAvatarUrl.split('/').pop().split('.')[0];
+   }
+
    const avatar = await uplaodOnCloudinary(avatarLocalPath)
    if(!avatar.url){
       throw new ApiError(400,"Avatar upload failed")
    }
    
-   User.findByIdAndUpdate(
+   const updatedUser = await User.findByIdAndUpdate(
       req.user?._id,
       {
          $set:{
@@ -358,27 +371,49 @@ const updateUserAvatar = asyncHandler(async(req,res)=>{
       }
    ).select("-password -refreshToken")
 
+   // Delete the old avatar from cloudinary
+   // Check if the avatar was successfully updated in the database
+   if(updatedUser && updatedUser.avatar === avatar.url){
+      if (publicId) {
+         await deleteFileFromCloudinary(publicId);  // Delete the old image
+      }
+   }else {
+      throw new ApiError(500, "Avatar update failed in database");
+   }
+   
    return res
    .status(200)
-   .json(new ApiResponse(200,user,"Avatar updated successfully"))
+   .json(new ApiResponse(200,updatedUser,"Avatar updated successfully"))
 })
-const updateUserCoverIMage = asyncHandler(async(req,res)=>{
+
+const updateUserCoverImage = asyncHandler(async(req,res)=>{
    const coverLocalPath = req.files?.path
 
    if(!coverLocalPath){
       throw new ApiError(400,"Cover image is required")
    }
 
-   const cover = await uplaodOnCloudinary(avatarLocalPath)
-   if(!cover.url){
+   // TODO: delete old image from cloudinary
+
+   const userOldCoverUrl = await User.findById(req.user?._id)?.coverImage
+
+   // Extract public ID from the current avatar URL
+   // const currentAvatarUrl = user?.avatar;
+   let publicId      //store the public id to use in future while deleting from cloudinary
+   if (userOldCoverUrl) {
+      publicId = userOldCoverUrl.split('/').pop().split('.')[0];
+   }
+
+   const coverImage = await uplaodOnCloudinary(avatarLocalPath)
+   if(!coverImage.url){
       throw new ApiError(400,"Cover image upload failed")
    }
    
-   User.findByIdAndUpdate(
+   const updatedUser = await User.findByIdAndUpdate(
       req.user?._id,
       {
          $set:{
-            coverImage: cover.url
+            coverImage: coverImage.url
          }
       },
       {
@@ -386,9 +421,19 @@ const updateUserCoverIMage = asyncHandler(async(req,res)=>{
       }
    ).select("-password -refreshToken")
 
+   // Delete the old coverImage from cloudinary
+   // Check if the cover was successfully updated in the database
+   if(updatedUser && updatedUser.coverImage === coverImage.url){
+      if (publicId) {
+         await deleteFileFromCloudinary(publicId);  // Delete the old image
+      }
+   }else {
+      throw new ApiError(500, "Avatar update failed in database");
+   }
+
    return res
    .status(200)
-   .json(new ApiResponse(200,user,"Cover image updated successfully"))
+   .json(new ApiResponse(200,updatedUser,"Cover image updated successfully"))
 })
 
-export {registerUser,loginUser,logOutUser,refreshAccessToken,changeCurrentPassword,getCurrentUser,updateAccountDetails,updateUserAvatar,updateUserCoverIMage}
+export {registerUser,loginUser,logOutUser,refreshAccessToken,changeCurrentPassword,getCurrentUser,updateAccountDetails,updateUserAvatar,updateUserCoverImage}
