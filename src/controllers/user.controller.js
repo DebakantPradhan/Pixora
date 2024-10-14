@@ -6,6 +6,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 
 
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const generateAccessAndRefreshTokens = async function(userId){
    try {
@@ -436,4 +437,135 @@ const updateUserCoverImage = asyncHandler(async(req,res)=>{
    .json(new ApiResponse(200,updatedUser,"Cover image updated successfully"))
 })
 
-export {registerUser,loginUser,logOutUser,refreshAccessToken,changeCurrentPassword,getCurrentUser,updateAccountDetails,updateUserAvatar,updateUserCoverImage}
+const getUserChannelProfile = asyncHandler(async (req,res) => {
+   const {username} = req.params
+
+   if(!username?.trim()){
+      throw new ApiError(400, "username is missing")
+   }
+
+   // User.find({username})      //No need to find everything manually
+   
+   //aggregation pipelines in database. Taken an input as an array, and inside it we write stages of the aggregations or they are called pipelines
+   const channel =  await User.aggregate([
+      {
+         $match:{
+            username: username?.toLowerCase()
+         }
+      },
+      {
+         $lookup:{
+            from:"subscriptions",      //because Subscription schema is converted to lowercase and plural
+            localfield:"_id",
+            foreignField:"channel",
+            as:"subscribers"
+         }         
+      },
+      {
+         $lookup:{
+            from:"subscriptions",
+            localfield:"_id",
+            foreignField:"subscriber",
+            as:"subscriptions"            //subscribed to which
+         }  
+      },
+      {
+         $addFields:{
+            subscribersCount : {
+               $size: "$subscribers"         //$size(aggregation): Counts and returns the total number of items in an array.
+            },
+            channelsSubscribedToCount: {
+               $size : "$subscriptions"
+            },
+            isSubscribed: {
+               $cond : {
+                  if : {$in : [req.user?._id, "$subscribers"]},
+                  then : true,
+                  else : false
+               } 
+            }
+         }
+      },
+      {
+         $project : {
+            fullName : 1,
+            username : 1,
+            subscribersCount : 1,
+            channelsSubscribedToCount : 1,
+            isSubscribed : 1,
+            avatar : 1,
+            coverImage: 1,
+            email : 1
+         }
+      }
+   ])
+
+   if(!channel?.length){
+      throw new ApiError(404,"Channel does not exist.")
+   }
+
+   return res
+   .status(200)
+   .json(
+      new ApiResponse(200, channel[0], "User channel fetched successfully.")
+   )
+})
+
+const getWatchHistory = asyncHandler(async (req,res) => {
+   const user = await User.aggregate([
+      {
+         $match:{
+            _id : new mongoose.Types.ObjectId(req.user._id)       //used to create a new ObjectId from a hexadecimal string. This can be particularly useful when you have a user ID in string format and need to convert it to a MongoDB ObjectId
+
+            //But the above method has been deprecated So use the following instead
+            //_id : mongoose.Types.ObjectId.createFromHexString(req.user._id)
+         }
+      },
+      {
+         $lookup:{
+            from:"videos",     //Not Video because everything converted to small and plural while the document is created.
+            localField:"watchHistory",
+            foreignField:"_id",
+            as: "watchHistory",
+
+            // adding sub pipelines
+            pipeline:[
+               {
+                  $lookup:{
+                     from:"users",
+                     localField:"owner",
+                     foreignField:"_id",
+                     as:"owner",
+                     pipeline:[     //we could have taken next pipeline but we choose nested one
+                        {
+                           $project:{
+                              fullName: 1,
+                              username:1,
+                              avatar:1,
+                           },
+                        },
+                        {
+                           $addFields:{
+                              owner:{
+                                 $first: "$owner"
+                              }
+                           }
+                        }
+                     ]
+                  }
+               }
+            ]
+
+
+         }
+         
+
+      }
+   ])
+
+   return res
+   .status(200)
+   .json(new ApiResponse(200,user[0].watchHistory,"watchHistory fetched successfully"))
+})
+
+export {registerUser,loginUser,logOutUser,refreshAccessToken,changeCurrentPassword,getCurrentUser,updateAccountDetails,updateUserAvatar,updateUserCoverImage, getUserChannelProfile,getWatchHistory}
