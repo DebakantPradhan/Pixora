@@ -149,7 +149,7 @@ const loginUser = asyncHandler(async (req,res) =>{
    const loggedInUser = await User.findById(user._id).
    select("-password -refreshToken")
 
-   console.log(loggedInUser);
+   // console.log(loggedInUser);
    
 
    const options ={
@@ -214,14 +214,16 @@ const refreshAccessToken = asyncHandler(async (req,res,next)=>{
    }
 
    try {
-      const incomingDecodedToken = jwt.verify(incomingRefreshToken,process.env.REFRESH_TOKEN_SECRET)
+      const decodedToken =jwt.verify(incomingRefreshToken,process.env.REFRESH_TOKEN_SECRET)
+      console.log("token:",decodedToken);
+      
    
-      const user = await User.findById(incomingDecodedToken?._id)
+      const user = await User.findById(decodedToken?._id)
       if(!user){
          throw new ApiError(401,"Invalid refreshToken")
       }
    
-      if (incomingDecodedToken !== user?.refreshToken) {
+      if (incomingRefreshToken !== user?.refreshToken) {
          throw new ApiError(401,"refreshToken is expired or used")      
       }
    
@@ -234,8 +236,8 @@ const refreshAccessToken = asyncHandler(async (req,res,next)=>{
    
       return res
       .status(200)
-      .cookies("accessToken",accessToken,options)
-      .cookies("refreshToken",refreshToken,options)
+      .cookie("accessToken",accessToken,options)
+      .cookie("refreshToken",refreshToken,options)
       .json(
          new ApiResponse(
             200,
