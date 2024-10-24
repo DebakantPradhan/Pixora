@@ -216,8 +216,6 @@ const refreshAccessToken = asyncHandler(async (req,res,next)=>{
    try {
       const decodedToken =jwt.verify(incomingRefreshToken,process.env.REFRESH_TOKEN_SECRET)
       
-      
-   
       const user = await User.findById(decodedToken?._id)
       if(!user){
          throw new ApiError(401,"Invalid refreshToken")
@@ -458,7 +456,7 @@ const getUserChannelProfile = asyncHandler(async (req,res) => {
       {
          $lookup:{
             from:"subscriptions",      //because Subscription schema is converted to lowercase and plural
-            localfield:"_id",
+            localField:"_id",
             foreignField:"channel",
             as:"subscribers"
          }         
@@ -466,7 +464,7 @@ const getUserChannelProfile = asyncHandler(async (req,res) => {
       {
          $lookup:{
             from:"subscriptions",
-            localfield:"_id",
+            localField:"_id",
             foreignField:"subscriber",
             as:"subscriptions"            //subscribed to which
          }  
